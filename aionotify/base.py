@@ -80,8 +80,7 @@ class Watcher:
         self.descriptors[alias] = wd
         self.aliases[wd] = alias
 
-    @asyncio.coroutine
-    def setup(self, loop):
+    async def setup(self, loop):
         """Start the watcher, registering new watches if any."""
         self._loop = loop
 
@@ -90,7 +89,7 @@ class Watcher:
             self._setup_watch(alias, path, flags)
 
         # We pass ownership of the fd to the transport; it will close it.
-        self._stream, self._transport = yield from aioutils.stream_from_fd(self._fd, loop)
+        self._stream, self._transport = await aioutils.stream_from_fd(self._fd, loop)
 
     def close(self):
         """Schedule closure.
@@ -105,19 +104,18 @@ class Watcher:
         """Are we closed?"""
         return self._transport is None
 
-    @asyncio.coroutine
-    def get_event(self):
+    async def get_event(self):
         """Fetch an event.
 
         This coroutine will swallow events for removed watches.
         """
         while True:
-            prefix = yield from self._stream.readexactly(PREFIX.size)
+            prefix = await self._stream.readexactly(PREFIX.size)
             if prefix == b'':
                 # We got closed, return None.
                 return
             wd, flags, cookie, length = PREFIX.unpack(prefix)
-            path = yield from self._stream.readexactly(length)
+            path = await self._stream.readexactly(length)
 
             # All async performed, time to look at the event's content.
             if wd not in self.aliases:
